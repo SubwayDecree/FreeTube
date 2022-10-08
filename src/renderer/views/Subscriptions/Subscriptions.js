@@ -28,14 +28,11 @@ export default Vue.extend({
       isLoading: false,
       dataLimit: 100,
       videoList: [],
-      errorChannels: []
+      errorChannels: [],
+      attemptedFetch: false
     }
   },
   computed: {
-    usingElectron: function () {
-      return this.$store.getters.getUsingElectron
-    },
-
     backendPreference: function () {
       return this.$store.getters.getBackendPreference
     },
@@ -90,6 +87,9 @@ export default Vue.extend({
 
     hideLiveStreams: function() {
       return this.$store.getters.getHideLiveStreams
+    },
+    fetchSubscriptionsAutomatically: function() {
+      return this.$store.getters.getFetchSubscriptionsAutomatically
     }
   },
   watch: {
@@ -124,10 +124,12 @@ export default Vue.extend({
       }
 
       this.isLoading = false
-    } else {
+    } else if (this.fetchSubscriptionsAutomatically) {
       setTimeout(async () => {
         this.getSubscriptions()
       }, 300)
+    } else {
+      this.isLoading = false
     }
   },
   methods: {
@@ -153,13 +155,14 @@ export default Vue.extend({
       this.isLoading = true
       this.updateShowProgressBar(true)
       this.setProgressBarPercentage(0)
+      this.attemptedFetch = true
 
       let videoList = []
       let channelCount = 0
       this.errorChannels = []
       this.activeSubscriptionList.forEach(async (channel) => {
         let videos = []
-        if (!this.usingElectron || this.backendPreference === 'invidious') {
+        if (!process.env.IS_ELECTRON || this.backendPreference === 'invidious') {
           if (useRss) {
             videos = await this.getChannelVideosInvidiousRSS(channel)
           } else {
@@ -234,8 +237,13 @@ export default Vue.extend({
           }
         }))
         this.isLoading = false
-      } else {
+      } else if (this.fetchSubscriptionsAutomatically) {
         this.getSubscriptions()
+      } else if (this.activeProfile._id === this.profileSubscriptions.activeProfile) {
+        this.videoList = this.profileSubscriptions.videoList
+      } else {
+        this.videoList = []
+        this.attemptedFetch = false
       }
     },
 
@@ -258,13 +266,13 @@ export default Vue.extend({
 
           resolve(videos)
         }).catch((err) => {
-          console.log(err)
+          console.error(err)
           const errorMessage = this.$t('Local API Error (Click to copy)')
           this.showToast({
             message: `${errorMessage}: ${err}`,
             time: 10000,
             action: () => {
-              navigator.clipboard.writeText(err)
+              this.copyToClipboard({ content: err })
             }
           })
           switch (failedAttempts) {
@@ -317,7 +325,7 @@ export default Vue.extend({
 
           resolve(items)
         }).catch((err) => {
-          console.log(err)
+          console.error(err)
           if (err.toString().match(/404/)) {
             this.errorChannels.push(channel)
             resolve([])
@@ -327,7 +335,7 @@ export default Vue.extend({
               message: `${errorMessage}: ${err}`,
               time: 10000,
               action: () => {
-                navigator.clipboard.writeText(err)
+                this.copyToClipboard({ content: err })
               }
             })
             switch (failedAttempts) {
@@ -369,13 +377,13 @@ export default Vue.extend({
             return video
           })))
         }).catch((err) => {
-          console.log(err)
+          console.error(err)
           const errorMessage = this.$t('Invidious API Error (Click to copy)')
           this.showToast({
             message: `${errorMessage}: ${err.responseText}`,
             time: 10000,
             action: () => {
-              navigator.clipboard.writeText(err)
+              this.copyToClipboard({ content: err.responseText })
             }
           })
           switch (failedAttempts) {
@@ -420,13 +428,13 @@ export default Vue.extend({
             return video
           })))
         }).catch((err) => {
-          console.log(err)
+          console.error(err)
           const errorMessage = this.$t('Invidious API Error (Click to copy)')
           this.showToast({
             message: `${errorMessage}: ${err}`,
             time: 10000,
             action: () => {
-              navigator.clipboard.writeText(err)
+              this.copyToClipboard({ content: err })
             }
           })
           if (err.toString().match(/500/)) {
@@ -469,7 +477,8 @@ export default Vue.extend({
       'updateShowProgressBar',
       'updateProfileSubscriptions',
       'updateAllSubscriptionsList',
-      'calculatePublishedDate'
+      'calculatePublishedDate',
+      'copyToClipboard'
     ]),
 
     ...mapMutations([

@@ -13,6 +13,7 @@ import FtAgeRestricted from '../../components/ft-age-restricted/ft-age-restricte
 import ytch from 'yt-channel-info'
 import autolinker from 'autolinker'
 import { MAIN_PROFILE_ID } from '../../../constants'
+import i18n from '../../i18n/index'
 
 export default Vue.extend({
   name: 'Search',
@@ -67,10 +68,6 @@ export default Vue.extend({
     }
   },
   computed: {
-    usingElectron: function () {
-      return this.$store.getters.getUsingElectron
-    },
-
     backendPreference: function () {
       return this.$store.getters.getBackendPreference
     },
@@ -136,11 +133,15 @@ export default Vue.extend({
       ]
     },
 
+    currentLocale: function () {
+      return i18n.locale.replace('_', '-')
+    },
+
     formattedSubCount: function () {
       if (this.hideChannelSubscriptions) {
         return null
       }
-      return this.subCount.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',')
+      return Intl.NumberFormat(this.currentLocale).format(this.subCount)
     },
 
     showFetchMoreButton: function () {
@@ -185,20 +186,13 @@ export default Vue.extend({
       this.apiUsed = ''
       this.isLoading = true
 
-      if (!this.usingElectron) {
-        this.getVideoInformationInvidious()
+      if (!process.env.IS_ELECTRON || this.backendPreference === 'invidious') {
+        this.getChannelInfoInvidious()
+        this.getPlaylistsInvidious()
       } else {
-        switch (this.backendPreference) {
-          case 'local':
-            this.getChannelInfoLocal()
-            this.getChannelVideosLocal()
-            this.getPlaylistsLocal()
-            break
-          case 'invidious':
-            this.getChannelInfoInvidious()
-            this.getPlaylistsInvidious()
-            break
-        }
+        this.getChannelInfoLocal()
+        this.getChannelVideosLocal()
+        this.getPlaylistsLocal()
       }
     },
 
@@ -241,20 +235,13 @@ export default Vue.extend({
     this.currentTab = this.$route.params.currentTab ?? 'videos'
     this.isLoading = true
 
-    if (!this.usingElectron) {
-      this.getVideoInformationInvidious()
+    if (!process.env.IS_ELECTRON || this.backendPreference === 'invidious') {
+      this.getChannelInfoInvidious()
+      this.getPlaylistsInvidious()
     } else {
-      switch (this.backendPreference) {
-        case 'local':
-          this.getChannelInfoLocal()
-          this.getChannelVideosLocal()
-          this.getPlaylistsLocal()
-          break
-        case 'invidious':
-          this.getChannelInfoInvidious()
-          this.getPlaylistsInvidious()
-          break
-      }
+      this.getChannelInfoLocal()
+      this.getChannelVideosLocal()
+      this.getPlaylistsLocal()
     }
   },
   methods: {
@@ -317,13 +304,13 @@ export default Vue.extend({
 
         this.isLoading = false
       }).catch((err) => {
-        console.log(err)
+        console.error(err)
         const errorMessage = this.$t('Local API Error (Click to copy)')
         this.showToast({
           message: `${errorMessage}: ${err}`,
           time: 10000,
           action: () => {
-            navigator.clipboard.writeText(err)
+            this.copyToClipboard({ content: err })
           }
         })
         if (this.backendPreference === 'local' && this.backendFallback) {
@@ -349,13 +336,13 @@ export default Vue.extend({
         this.videoContinuationString = response.continuation
         this.isElementListLoading = false
       }).catch((err) => {
-        console.log(err)
+        console.error(err)
         const errorMessage = this.$t('Local API Error (Click to copy)')
         this.showToast({
           message: `${errorMessage}: ${err}`,
           time: 10000,
           action: () => {
-            navigator.clipboard.writeText(err)
+            this.copyToClipboard({ content: err })
           }
         })
         if (this.backendPreference === 'local' && this.backendFallback) {
@@ -374,13 +361,13 @@ export default Vue.extend({
         this.latestVideos = this.latestVideos.concat(response.items)
         this.videoContinuationString = response.continuation
       }).catch((err) => {
-        console.log(err)
+        console.error(err)
         const errorMessage = this.$t('Local API Error (Click to copy)')
         this.showToast({
           message: `${errorMessage}: ${err}`,
           time: 10000,
           action: () => {
-            navigator.clipboard.writeText(err)
+            this.copyToClipboard({ content: err })
           }
         })
       })
@@ -396,7 +383,6 @@ export default Vue.extend({
           return
         }
 
-        console.log(response)
         const channelName = response.author
         const channelId = response.authorId
         this.channelName = channelName
@@ -414,7 +400,7 @@ export default Vue.extend({
         this.channelDescription = autolinker.link(response.description)
         this.relatedChannels = response.relatedChannels.map((channel) => {
           channel.authorThumbnails[channel.authorThumbnails.length - 1].url = channel.authorThumbnails[channel.authorThumbnails.length - 1].url.replace('https://yt3.ggpht.com', `${this.currentInvidiousInstance}/ggpht/`)
-
+          channel.channelId = channel.authorId
           return channel
         })
         this.latestVideos = response.latestVideos
@@ -429,13 +415,13 @@ export default Vue.extend({
         this.isLoading = false
       }).catch((err) => {
         this.setErrorMessage(err.responseJSON.error)
-        console.log(err)
+        console.error(err)
         const errorMessage = this.$t('Invidious API Error (Click to copy)')
         this.showToast({
           message: `${errorMessage}: ${err.responseJSON.error}`,
           time: 10000,
           action: () => {
-            navigator.clipboard.writeText(err)
+            this.copyToClipboard({ content: err.responseJSON.error })
           }
         })
         this.isLoading = false
@@ -457,13 +443,13 @@ export default Vue.extend({
         this.latestVideosPage++
         this.isElementListLoading = false
       }).catch((err) => {
-        console.log(err)
+        console.error(err)
         const errorMessage = this.$t('Local API Error (Click to copy)')
         this.showToast({
           message: `${errorMessage}: ${err}`,
           time: 10000,
           action: () => {
-            navigator.clipboard.writeText(err)
+            this.copyToClipboard({ content: err })
           }
         })
       })
@@ -476,7 +462,6 @@ export default Vue.extend({
           return
         }
 
-        console.log(response)
         this.latestPlaylists = response.items.map((item) => {
           item.proxyThumbnail = false
           return item
@@ -484,13 +469,13 @@ export default Vue.extend({
         this.playlistContinuationString = response.continuation
         this.isElementListLoading = false
       }).catch((err) => {
-        console.log(err)
+        console.error(err)
         const errorMessage = this.$t('Local API Error (Click to copy)')
         this.showToast({
           message: `${errorMessage}: ${err}`,
           time: 10000,
           action: () => {
-            navigator.clipboard.writeText(err)
+            this.copyToClipboard({ content: err })
           }
         })
         if (this.backendPreference === 'local' && this.backendFallback) {
@@ -506,17 +491,16 @@ export default Vue.extend({
 
     getPlaylistsLocalMore: function () {
       ytch.getChannelPlaylistsMore({ continuation: this.playlistContinuationString }).then((response) => {
-        console.log(response)
         this.latestPlaylists = this.latestPlaylists.concat(response.items)
         this.playlistContinuationString = response.continuation
       }).catch((err) => {
-        console.log(err)
+        console.error(err)
         const errorMessage = this.$t('Local API Error (Click to copy)')
         this.showToast({
           message: `${errorMessage}: ${err}`,
           time: 10000,
           action: () => {
-            navigator.clipboard.writeText(err)
+            this.copyToClipboard({ content: err })
           }
         })
       })
@@ -536,13 +520,13 @@ export default Vue.extend({
         this.latestPlaylists = response.playlists
         this.isElementListLoading = false
       }).catch((err) => {
-        console.log(err)
+        console.error(err)
         const errorMessage = this.$t('Invidious API Error (Click to copy)')
         this.showToast({
           message: `${errorMessage}: ${err.responseJSON.error}`,
           time: 10000,
           action: () => {
-            navigator.clipboard.writeText(err.responseJSON.error)
+            this.copyToClipboard({ content: err.responseJSON.error })
           }
         })
         if (this.backendPreference === 'invidious' && this.backendFallback) {
@@ -558,7 +542,7 @@ export default Vue.extend({
 
     getPlaylistsInvidiousMore: function () {
       if (this.playlistContinuationString === null) {
-        console.log('There are no more playlists available for this channel')
+        console.warn('There are no more playlists available for this channel')
         return
       }
 
@@ -579,13 +563,13 @@ export default Vue.extend({
         this.latestPlaylists = this.latestPlaylists.concat(response.playlists)
         this.isElementListLoading = false
       }).catch((err) => {
-        console.log(err)
+        console.error(err)
         const errorMessage = this.$t('Invidious API Error (Click to copy)')
         this.showToast({
           message: `${errorMessage}: ${err.responseJSON.error}`,
           time: 10000,
           action: () => {
-            navigator.clipboard.writeText(err.responseJSON.error)
+            this.copyToClipboard({ content: err.responseJSON.error })
           }
         })
         if (this.backendPreference === 'invidious' && this.backendFallback) {
@@ -613,7 +597,7 @@ export default Vue.extend({
           message: this.$t('Channel.Channel has been removed from your subscriptions')
         })
 
-        if (this.activeProfile === MAIN_PROFILE_ID) {
+        if (this.activeProfile._id === MAIN_PROFILE_ID) {
           // Check if a subscription exists in a different profile.
           // Remove from there as well.
           let duplicateSubscriptions = 0
@@ -658,7 +642,7 @@ export default Vue.extend({
           message: this.$t('Channel.Added channel to your subscriptions')
         })
 
-        if (this.activeProfile !== MAIN_PROFILE_ID) {
+        if (this.activeProfile._id !== MAIN_PROFILE_ID) {
           const index = primaryProfile.subscriptions.findIndex((channel) => {
             return channel.id === this.id
           })
@@ -740,18 +724,17 @@ export default Vue.extend({
     searchChannelLocal: function () {
       if (this.searchContinuationString === '') {
         ytch.searchChannel({ channelId: this.id, channelIdType: this.idType, query: this.lastSearchQuery }).then((response) => {
-          console.log(response)
           this.searchResults = response.items
           this.isElementListLoading = false
           this.searchContinuationString = response.continuation
         }).catch((err) => {
-          console.log(err)
+          console.error(err)
           const errorMessage = this.$t('Local API Error (Click to copy)')
           this.showToast({
             message: `${errorMessage}: ${err}`,
             time: 10000,
             action: () => {
-              navigator.clipboard.writeText(err)
+              this.copyToClipboard({ content: err })
             }
           })
           if (this.backendPreference === 'local' && this.backendFallback) {
@@ -765,18 +748,17 @@ export default Vue.extend({
         })
       } else {
         ytch.searchChannelMore({ continuation: this.searchContinuationString }).then((response) => {
-          console.log(response)
           this.searchResults = this.searchResults.concat(response.items)
           this.isElementListLoading = false
           this.searchContinuationString = response.continuation
         }).catch((err) => {
-          console.log(err)
+          console.error(err)
           const errorMessage = this.$t('Local API Error (Click to copy)')
           this.showToast({
             message: `${errorMessage}: ${err}`,
             time: 10000,
             action: () => {
-              navigator.clipboard.writeText(err)
+              this.copyToClipboard({ content: err })
             }
           })
         })
@@ -798,13 +780,13 @@ export default Vue.extend({
         this.isElementListLoading = false
         this.searchPage++
       }).catch((err) => {
-        console.log(err)
+        console.error(err)
         const errorMessage = this.$t('Invidious API Error (Click to copy)')
         this.showToast({
           message: `${errorMessage}: ${err}`,
           time: 10000,
           action: () => {
-            navigator.clipboard.writeText(err)
+            this.copyToClipboard({ content: err })
           }
         })
         if (this.backendPreference === 'invidious' && this.backendFallback) {
@@ -823,7 +805,8 @@ export default Vue.extend({
       'updateProfile',
       'invidiousGetChannelInfo',
       'invidiousAPICall',
-      'updateSubscriptionDetails'
+      'updateSubscriptionDetails',
+      'copyToClipboard'
     ])
   }
 })

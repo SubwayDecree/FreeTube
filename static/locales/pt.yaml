@@ -411,6 +411,9 @@ Settings:
     Ignore Unsupported Action Warnings: Ignorar avisos sobre ações inválidas
     External Player: Leitor externo
     External Player Settings: Definições para leitores de vídeo externos
+    Players:
+      None:
+        Name: Nenhum
   The app needs to restart for changes to take effect. Restart and apply change?: A
     aplicação precisa de reiniciar para que as alterações façam efeito. Reiniciar
     e aplicar as alterações?
@@ -622,6 +625,7 @@ Video:
     Years: 'Anos'
     Ago: 'Há'
     Upcoming: 'Estreia em'
+    Less than a minute: Menos de um minuto
   Published on: 'Publicado a'
   # $ is replaced with the number and % with the unit (days, hours, minutes...)
   Publicationtemplate: 'Há $ %'
@@ -692,6 +696,7 @@ Video:
     Bandwidth: Largura de banda
     Buffered: Em buffer
     Dropped / Total Frames: Fotogramas perdidos / total de fotogramas
+  Premieres in: Estreia em
 Videos:
   #& Sort By
   Sort By:
@@ -719,7 +724,7 @@ Playlist:
   Playlist: Lista de reprodução
 Toggle Theatre Mode: 'Alternar modo cinema'
 Change Format:
-  Change Video Formats: 'Mudar formatos do vídeo'
+  Change Media Formats: 'Mudar formatos do vídeo'
   Use Dash Formats: 'Utilizar formatos DASH'
   Use Legacy Formats: 'Utilizar formatos antigos'
   Use Audio Formats: 'Utilizar formatos de áudio'

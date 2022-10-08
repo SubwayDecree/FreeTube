@@ -18,20 +18,20 @@ Paste: 'Incolla'
 Delete: 'Elimina'
 Select all: 'Seleziona tutto'
 Reload: 'Ricarica'
-Force Reload: 'Forza il ricaricamento'
+Force Reload: 'Forza ricarica'
 Toggle Developer Tools: 'Abilita o disabilita strumenti sviluppatore'
-Actual size: 'Grandezza effettiva'
+Actual size: 'Dimensione reale'
 Zoom in: 'Ingrandisci'
 Zoom out: 'Rimpicciolisci'
 Toggle fullscreen: 'Mostra a schermo intero'
 Window: 'Finestra'
-Minimize: 'Minimizza'
+Minimize: 'Riduci'
 Close: 'Chiudi'
 Back: 'Indietro'
 Forward: 'Avanti'
 
 # Search Bar
-Search / Go to URL: 'Cerca o aggiungi link YouTube'
+Search / Go to URL: 'Cerca o aggiungi URL YouTube'
   # In Filter Button
 Search Filters:
   Search Filters: 'Filtri di ricerca'
@@ -82,6 +82,9 @@ Subscriptions:
   This profile has a large number of subscriptions.  Forcing RSS to avoid rate limiting: Questo
     profilo ha un grande numero di iscrizioni. Utilizzerò RSS per evitare limitazioni
   Error Channels: Canali con errori
+  Disabled Automatic Fetching: Hai disabilitato il recupero automatico dell'abbonamento.
+    Aggiorna gli abbonamenti per vederli qui.
+  Empty Channels: I tuoi canali a cui sei iscritto attualmente non hanno video.
 Trending:
   Trending: 'Tendenze'
   Music: Musica
@@ -153,7 +156,7 @@ Settings:
     External Link Handling:
       No Action: Nessuna azione
       Ask Before Opening Link: Chiedi prima di aprire il link
-      Open Link: Apri il link
+      Open Link: Apri link
       External Link Handling: Gestione dei collegamenti esterni
   Theme Settings:
     Theme Settings: 'Impostazioni del tema'
@@ -296,6 +299,7 @@ Settings:
     Export Subscriptions: 'Esporta Iscrizioni'
     How do I import my subscriptions?: 'Come importo le mie iscrizioni?'
     Fetch Feeds from RSS: Scarica aggiornamenti dai flussi RSS
+    Fetch Automatically: Recupera feed automaticamente
   Advanced Settings:
     Advanced Settings: 'Impostazioni Avanzate'
     Enable Debug Mode (Prints data to the console): 'Abilità modalità Sviluppatore
@@ -386,6 +390,7 @@ Settings:
     Hide Live Streams: Nascondi i video in diretta
     Hide Sharing Actions: Nascondi le azioni di condivisione
     Hide Video Description: Nascondi la descrizione del video
+    Hide Chapters: Nascondi i capitoli
   The app needs to restart for changes to take effect. Restart and apply change?: L'applicazione
     deve essere riavviata per applicare i cambiamenti. Riavvio e applico i cambiamenti
     subito?
@@ -431,12 +436,12 @@ Settings:
       None:
         Name: Nessuno
   Download Settings:
-    Download Settings: Impostazioni di scaricamento
-    Ask Download Path: Chiedi il percorso di scaricamento
-    Choose Path: Scegli il percorso
-    Download Behavior: Comportamento degli scaricamenti
+    Download Settings: Impostazioni download
+    Ask Download Path: Chiedi il percorso di download
+    Choose Path: Scegli percorso
+    Download Behavior: Comportamento download
     Open in web browser: Apri nel browser web
-    Download in app: Scarica nell'app
+    Download in app: Download nell'app
   Parental Control Settings:
     Hide Unsubscribe Button: Nascondi il pulsante Annulla iscrizione
     Parental Control Settings: Impostazioni di controllo parentale
@@ -481,7 +486,7 @@ About:
   FAQ: Domande frequenti
   FreeTube Wiki: Wiki FreeTube
   Help: Aiuto
-  Downloads / Changelog: Download e changelog
+  Downloads / Changelog: Download / Changelog
   GitHub releases: Versioni pubblicate su GitHub
   these people and projects: queste persone e questi progetti
   FreeTube is made possible by: FreeTube è reso possibile grazie a
@@ -504,7 +509,7 @@ Channel:
   Subscribers: 'Iscritti'
   Subscribe: 'Iscriviti'
   Unsubscribe: 'Disiscriviti'
-  Search Channel: 'Cerca un canale'
+  Search Channel: 'Cerca nel canale'
   Your search results have returned 0 results: 'La tua ricerca ha prodotto 0 risultati'
   Sort By: 'Ordina per'
   Videos:
@@ -591,6 +596,8 @@ Video:
     Upcoming: 'Première il'
     Minutes: Minuti
     Minute: Minuto
+    Less than a minute: Meno di un minuto
+    In less than a minute: In meno di un minuto
   Published on: 'Pubblicato il'
   # $ is replaced with the number and % with the unit (days, hours, minutes...)
   Publicationtemplate: '$ % fa'
@@ -610,10 +617,10 @@ Video:
     Low: Basso
   audio only: solo audio
   video only: solo video
-  Download Video: Scarica il video
-  Copy Invidious Channel Link: Copia link del canale Invidious
+  Download Video: Download video
+  Copy Invidious Channel Link: Copia link canale Invidious
   Open Channel in Invidious: Apri il canale con Invidious
-  Copy YouTube Channel Link: Copia link del canale YouTube
+  Copy YouTube Channel Link: Copia link canale YouTube
   Open Channel in YouTube: Apri il canale con YouTube
   Started streaming on: Stream iniziato il
   Streamed on: Streaming il
@@ -668,6 +675,8 @@ Video:
     Buffered: Memoria buffer
     Dropped / Total Frames: Frame persi / Frame totali
     Mimetype: Tipo di media
+  Premieres in: Anteprima in
+  Premieres: Première
 Videos:
   #& Sort By
   Sort By:
@@ -695,7 +704,7 @@ Playlist:
   Playlist: Playlist
 Toggle Theatre Mode: 'Attiva modalità cinema'
 Change Format:
-  Change Video Formats: 'Cambia formato video'
+  Change Media Formats: 'Cambia formato video'
   Use Dash Formats: 'Usa i formati DASH'
   Use Legacy Formats: 'Usa i formati legacy'
   Use Audio Formats: 'Usa i formati audio'
@@ -844,6 +853,8 @@ Tooltips:
       per leggere la tua lista iscrizioni. Gli RSS sono più veloci e impediscono il
       blocco dell'IP, ma non forniscono determinate informazioni come la durata del
       video o lo stato della diretta
+    Fetch Automatically: Se abilitato, FreeTube recupererà automaticamente il feed
+      dell'abbonamento quando viene aperta una nuova finestra e quando si cambia profilo.
   General Settings:
     Invidious Instance: Istanza Invidious che FreeTube usa per le chiamate API.
     Thumbnail Preference: Tutte le copertine attraverso FreeTube verranno sostituite
@@ -891,13 +902,13 @@ Hashtags have not yet been implemented, try again later: Gli hashtag non sono an
 Unknown YouTube url type, cannot be opened in app: Tipo di link YouTube sconosciuto,
   non può essere aperto nell'applicazione
 Search Bar:
-  Clear Input: Cancella l'ingresso
+  Clear Input: Pulisci ricerca
 External link opening has been disabled in the general settings: L'apertura dei collegamenti
   esterni è stata disabilitata nelle impostazioni generali
 Are you sure you want to open this link?: Sei sicuro di voler aprire questo link?
-Downloading has completed: '$ è stato scaricato'
-Starting download: Sto iniziando a scaricare $
-Downloading failed: C'è stato un problema nello scaricamento di $
+Downloading has completed: 'Il download di "$" è terminato'
+Starting download: Avvio del download di "$"
+Downloading failed: Si è verificato un problema durante il download di "$"
 Screenshot Success: Cattura schermata salvato come «$»
 Screenshot Error: Cattura schermata fallito. $
 Age Restricted:
@@ -915,3 +926,13 @@ Channels:
   Empty: L'elenco dei tuoi canali è attualmente vuoto.
   Unsubscribe Prompt: Sei sicuro/sicura di voler annullare l'iscrizione a «$»?
   Unsubscribe: Annulla l'iscrizione
+Clipboard:
+  Cannot access clipboard without a secure connection: Impossibile accedere agli appunti
+    senza una connessione sicura
+  Copy failed: Copia negli appunti non riuscita
+Chapters:
+  Chapters: Capitoli
+  'Chapters list visible, current chapter: {chapterName}': 'Elenco capitoli visibile,
+    capitolo corrente: {chapterName}'
+  'Chapters list hidden, current chapter: {chapterName}': 'Elenco capitoli nascosto,
+    capitolo corrente: {chapterName}'
