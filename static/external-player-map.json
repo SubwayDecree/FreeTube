@@ -13,7 +13,7 @@
             "defaultExecutable": "mpv",
             "defaultCustomArguments": null,
             "supportsYtdlProtocol": false,
-            "videoUrl": "",
+            "videoUrl": "https://youtube.com/watch?v=",
             "playlistUrl": "",
             "startOffset": "--start=",
             "playbackRate": "--speed=",
