@@ -12,7 +12,7 @@
         "cmdArguments": {
             "defaultExecutable": "mpv",
             "defaultCustomArguments": null,
-            "supportsYtdlProtocol": true,
+            "supportsYtdlProtocol": false,
             "videoUrl": "",
             "playlistUrl": "",
             "startOffset": "--start=",
