@@ -3,10 +3,18 @@
     <div
       class="playlistThumbnail"
     >
-      <img
-        :src="thumbnail"
-        @click="playFirstVideo"
+      <router-link
+        :to="{
+          path: `/watch/${firstVideoId}`,
+          query: { playlistId: id }
+        }"
+        tabindex="-1"
       >
+        <img
+          :src="thumbnail"
+          alt=""
+        >
+      </router-link>
     </div>
 
     <div class="playlistStats">
@@ -30,31 +38,33 @@
     <hr>
 
     <div
-      class="playlistChannel"
-      @click="goToChannel"
+      class="channelShareWrapper"
     >
-      <img
-        class="channelThumbnail"
-        :src="channelThumbnail"
+      <router-link
+        class="playlistChannel"
+        :to="`/channel/${channelId}`"
       >
-      <h3
-        class="channelName"
-      >
-        {{ channelName }}
-      </h3>
+        <img
+          class="channelThumbnail"
+          :src="channelThumbnail"
+          alt=""
+        >
+        <h3
+          class="channelName"
+        >
+          {{ channelName }}
+        </h3>
+      </router-link>
+
+      <ft-share-button
+        v-if="!hideSharingActions"
+        :id="id"
+        :dropdown-position-y="description ? 'top' : 'bottom'"
+        share-target-type="Playlist"
+      />
     </div>
-
-    <br>
-
-    <ft-list-dropdown
-      v-if="!hideSharingActions"
-      :title="$t('Playlist.Share Playlist.Share Playlist')"
-      :label-names="shareHeaders"
-      :label-values="shareValues"
-      @click="sharePlaylist"
-    />
   </div>
 </template>
 
 <script src="./playlist-info.js" />
-<style scoped lang="sass" src="./playlist-info.sass" />
+<style scoped lang="scss" src="./playlist-info.scss" />

@@ -9,8 +9,6 @@ const JsonMinimizerPlugin = require('json-minimizer-webpack-plugin')
 const CssMinimizerPlugin = require('css-minimizer-webpack-plugin')
 const ProcessLocalesPlugin = require('./ProcessLocalesPlugin')
 
-const { productName } = require('../package.json')
-
 const isDevMode = process.env.NODE_ENV === 'development'
 
 const config = {
@@ -24,11 +22,17 @@ const config = {
     path: path.join(__dirname, '../dist/web'),
     filename: '[name].js',
   },
-  externals: {
-    electron: '{}',
-    ytpl: '{}',
-    ytsr: '{}'
-  },
+  externals: [
+    {
+      electron: '{}'
+    },
+    ({ request }, callback) => {
+      if (request.startsWith('youtubei.js')) {
+        return callback(null, '{}')
+      }
+      callback()
+    }
+  ],
   module: {
     rules: [
       {
@@ -38,10 +42,15 @@ const config = {
       },
       {
         test: /\.vue$/,
-        loader: 'vue-loader'
+        loader: 'vue-loader',
+        options: {
+          compilerOptions: {
+            whitespace: 'condense',
+          }
+        }
       },
       {
-        test: /\.s(c|a)ss$/,
+        test: /\.scss$/,
         use: [
           {
             loader: MiniCssExtractPlugin.loader,
@@ -55,11 +64,7 @@ const config = {
           {
             loader: 'sass-loader',
             options: {
-              // eslint-disable-next-line
-              implementation: require('sass'),
-              sassOptions: {
-                indentedSyntax: true
-              }
+              implementation: require('sass')
             }
           },
         ],
@@ -114,8 +119,8 @@ const config = {
   },
   plugins: [
     new webpack.DefinePlugin({
-      'process.env.PRODUCT_NAME': JSON.stringify(productName),
-      'process.env.IS_ELECTRON': false
+      'process.env.IS_ELECTRON': false,
+      'process.env.IS_ELECTRON_MAIN': false
     }),
     new webpack.ProvidePlugin({
       process: 'process/browser',
@@ -131,21 +136,16 @@ const config = {
     new MiniCssExtractPlugin({
       filename: isDevMode ? '[name].css' : '[name].[contenthash].css',
       chunkFilename: isDevMode ? '[id].css' : '[id].[contenthash].css',
-    }),
+    })
   ],
   resolve: {
     alias: {
-      '@': path.join(__dirname, '../src/renderer'),
-      vue$: 'vue/dist/vue.esm.js',
-      src: path.join(__dirname, '../src/'),
-      icons: path.join(__dirname, '../_icons/'),
-      images: path.join(__dirname, '../src/renderer/assets/img/'),
-      static: path.join(__dirname, '../static/'),
+      vue$: 'vue/dist/vue.esm.js'
     },
     fallback: {
       buffer: require.resolve('buffer/'),
       dns: require.resolve('browserify/lib/_empty.js'),
-      fs: require.resolve('browserify/lib/_empty.js'),
+      'fs/promises': require.resolve('browserify/lib/_empty.js'),
       http: require.resolve('stream-http'),
       https: require.resolve('https-browserify'),
       net: require.resolve('browserify/lib/_empty.js'),
@@ -157,7 +157,7 @@ const config = {
       vm: require.resolve('vm-browserify'),
       zlib: require.resolve('browserify-zlib')
     },
-    extensions: ['.js', '.vue', '.json', '.css'],
+    extensions: ['.js', '.vue']
   },
   target: 'web',
 }
@@ -189,12 +189,6 @@ config.plugins.push(
           },
         },
     ]
-  }),
-  // webpack doesn't get rid of js-yaml even though it isn't used in the production builds
-  // so we need to manually tell it to ignore any imports for `js-yaml`
-  new webpack.IgnorePlugin({
-    resourceRegExp: /^js-yaml$/,
-    contextRegExp: /i18n$/
   })
 )
 

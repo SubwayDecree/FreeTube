@@ -53,12 +53,14 @@ Search Filters:
     Videos: 'Vídeos'
     Channels: 'Canais'
     #& Playlists
+    Movies: Filmes
   Duration:
     Duration: 'Duração'
     All Durations: 'Qualquer duração'
     Short (< 4 minutes): 'Curto (< 4 minutos)'
     Long (> 20 minutes): 'Longo (> 20 minutos)'
   # On Search Page
+    Medium (4 - 20 minutes): Médio (4 - 20 minutos)
   Search Results: 'Resultados da busca'
   Fetching results. Please wait: 'Buscando resultados. Por favor, espere'
   Fetch more results: 'Buscar mais resultados'
@@ -89,14 +91,14 @@ Trending:
   Music: Música
   Default: Padrão
 Most Popular: 'Mais populares'
-Playlists: 'Listas'
+Playlists: 'Listas de reprodução'
 User Playlists:
-  Your Playlists: 'Suas listas'
+  Your Playlists: 'Suas Listas de Reprodução'
   Your saved videos are empty. Click on the save button on the corner of a video to have it listed here: Os
-    seus vídeos guardados estão vazios. Clique no botão salvar no canto de um vídeo
-    para que ele seja listado aqui
+    seus vídeos salvos estão vazios. Clique no botão salvar no canto de um vídeo para
+    que ele seja listado aqui
   Playlist Message: Esta página não reflete listas de reprodução totalmente funcionais.
-    Ele só lista vídeos que você salvou ou favoritos. Quando o trabalho estiver concluído,
+    Ele só lista vídeos que você salvou ou favoritou. Quando o trabalho estiver concluído,
     todos os vídeos atualmente aqui serão migrados para uma playlist 'Favoritos'.
   Search bar placeholder: Pesquisar na Lista de Reprodução
   Empty Search Message: Não há vídeos nesta playlist que correspondam à sua pesquisa
@@ -209,6 +211,7 @@ Settings:
     Disable Smooth Scrolling: Desativar Rolagem Suave
     Expand Side Bar by Default: Expandir Barra Lateral por Padrão
     Hide Side Bar Labels: Ocultar etiquetas da barra lateral
+    Hide FreeTube Header Logo: Esconder o logotipo do cabeçalho do FreeTube
   Player Settings:
     Player Settings: 'Configurações do vídeo'
     Force Local Backend for Legacy Formats: 'Forçar motor local para formatos legados'
@@ -264,6 +267,9 @@ Settings:
         Segundo 2 dígitos. %T Milissegundo 3 dígitos. %s Segundo do vídeo. %t Milissegundo
         do vídeo 3 dígitos. %i ID do vídeo. Você também pode usar "\" ou "/" para
         criar subpastas.
+    Enter Fullscreen on Display Rotate: Entrar em tela cheia ao girar a tela
+    Skip by Scrolling Over Video Player: Pular rolando o tocador de vídeo
+    Allow DASH AV1 formats: Permitir formatos DASH AV1
   Subscription Settings:
     Subscription Settings: 'Configurações de inscrições'
     Hide Videos on Watch: 'Esconder vídeos após assisti-los'
@@ -323,6 +329,8 @@ Settings:
     Remove All Subscriptions / Profiles: Remover Todas as Inscrições / Perfis
     Automatically Remove Video Meta Files: Remover automaticamente os metarquivos
       de vídeo
+    Save Watched Videos With Last Viewed Playlist: Salvar os vídeos vistos com a última
+      lista de reprodução vista
   Data Settings:
     Subscriptions have been successfully exported: Inscrições foram exportadas com
       sucesso
@@ -364,14 +372,15 @@ Settings:
     Manage Subscriptions: Administrar Inscrições
     Import Playlists: Importar listas de reprodução
     Export Playlists: Exportar listas de reprodução
-    Playlist insufficient data: Dados insuficientes para "{playlist}" playlist, pulando
-      item
+    Playlist insufficient data: Dados insuficientes para a playlist "{playlist}",
+      pulando item
     All playlists has been successfully exported: Todas as listas de reprodução foram
       exportadas com sucesso
     All playlists has been successfully imported: Todas as listas de reprodução foram
       importadas com sucesso
     Subscription File: Arquivo de assinaturas
     History File: Arquivo de histórico
+    Playlist File: Arquivo de Lista
   Distraction Free Settings:
     Hide Live Chat: Esconder chat ao vivo
     Hide Popular Videos: Esconder vídeos populares
@@ -389,6 +398,11 @@ Settings:
     Hide Comments: Ocultar comentários
     Hide Live Streams: Ocultar transmissões ao vivo
     Hide Chapters: Ocultar capítulos
+    Hide Upcoming Premieres: Ocultar as Próximas Estréias
+    Hide Channels Placeholder: Nome ou ID do Canal
+    Display Titles Without Excessive Capitalisation: Mostrar Títulos sem Capitalização
+      Excessiva
+    Hide Channels: Ocultar Vídeos dos Canais
   The app needs to restart for changes to take effect. Restart and apply change?: O
     aplicativo necessita reiniciar para as mudanças fazerem efeito. Reiniciar e aplicar
     mudança?
@@ -443,6 +457,22 @@ Settings:
     Hide Search Bar: Ocultar barra de pesquisa
     Parental Control Settings: Configurações de Controle Parental
     Hide Unsubscribe Button: Ocultar botão de cancelamento de inscrição
+  Experimental Settings:
+    Experimental Settings: Configurações Experimentais
+    Warning: Essas configurações são experimentais, elas podem causar travamentos
+      enquanto ativadas. Fazer backups é altamente recomendado. Use por sua conta
+      e risco!
+    Replace HTTP Cache: Repor Cache HTTP
+  Password Settings:
+    Password Settings: Configurações de senha
+    Set Password: Definir Senha
+    Remove Password: Remover senha
+    Set Password To Prevent Access: Defina uma senha para impedir o acesso às configurações
+  Password Dialog:
+    Unlock: Desbloquear
+    Password Incorrect: Senha Incorreta
+    Password: Senha
+    Enter Password To Unlock: Digite a senha para desbloquear as configurações
 About:
   #On About page
   About: 'Sobre'
@@ -591,6 +621,7 @@ Video:
     Minutes: Minutos
     Minute: Minuto
     Less than a minute: Menos de um minuto
+    In less than a minute: Em menos de um minuto
   Published on: 'Publicado em'
   Publicationtemplate: 'Há {number} {unit}'
 #& Videos
@@ -644,7 +675,7 @@ Video:
     UnsupportedActionTemplate: '{externalPlayer} não suporta: {action}'
     playlist: playlist
     OpeningTemplate: Abrindo {videoOrPlaylist} em {externalPlayer}...
-    OpenInTemplate: Aberto em {externalPlayer}
+    OpenInTemplate: Abrir em {externalPlayer}
     video: vídeo
   Premieres on: Estreia em
   Stats:
@@ -668,6 +699,10 @@ Video:
     Buffered: Em buffer
     Dropped / Total Frames: Quadros perdidos / Total de quadros
   Premieres in: Estréias em
+  Premieres: Estreia
+  Scroll to Bottom: Rolar para o final
+  Show Super Chat Comment: Mostrar Comentários do Super Chat
+  Upcoming: Em breve
 Videos:
   #& Sort By
   Sort By:
@@ -682,12 +717,6 @@ Playlist:
   View: 'Visualização'
   Views: 'Visualizações'
   Last Updated On: 'Atualizado em'
-  Share Playlist:
-    Share Playlist: 'Compartilhar Lista'
-    Copy YouTube Link: 'Copiar link do YouTube'
-    Open in YouTube: 'Abrir no YouTube'
-    Copy Invidious Link: 'Copiar link do Invidious'
-    Open in Invidious: 'Abrir no Invidious'
 
 # On Video Watch Page
 #* Published
@@ -705,6 +734,7 @@ Change Format:
     este vídeo
 Share:
   Share Video: 'Compartilhar vídeo'
+  Share Playlist: 'Compartilhar Lista'
   Copy Link: 'Copiar link'
   Open Link: 'Abrir link'
   Copy Embed: 'Copiar incorporado'
@@ -721,6 +751,7 @@ Share:
   Invidious Channel URL copied to clipboard: URL do Canal Invidious copiado para a
     área de transferência
   Include Timestamp: Incluir Marcação de Tempo
+  Share Channel: Compartilhar Canal
 Mini Player: 'Visualizador Pequeno'
 Comments:
   Comments: 'Comentários'
@@ -746,6 +777,8 @@ Comments:
   And others: e outros
   From {channelName}: de {channelName}
   Member: Membro
+  Hearted: Coração
+  View {replyCount} replies: Exibir {replyCount} respostas
 Up Next: 'Próximo'
 
 # Toast Messages
@@ -827,6 +860,8 @@ Tooltips:
       padrão para obter o feed de sua assinatura. O RSS é mais rápido e evita bloqueio
       de IP, mas não fornece certas informações como duração do vídeo ou status ao
       vivo
+    Fetch Automatically: Quando habilitado, o FreeTube buscará automaticamente seu
+      feed de inscrições ao abrir uma nova janela e ao trocar o perfil.
   Player Settings:
     Default Video Format: Define os formatos usados quando um vídeo é reproduzido.
       Formatos DASH podem reproduzir qualidades mais altas. Os formatos antigos são
@@ -845,6 +880,12 @@ Tooltips:
       a tecla Control (tecla Command no Mac) e clique com o botão esquerdo do mouse
       para retornar rapidamente à taxa de reprodução padrão (1x a menos que tenha
       sido alterada nas configurações).
+    Skip by Scrolling Over Video Player: Use a roda de rolagem para pular o vídeo,
+      estilo MPV.
+    Allow DASH AV1 formats: Os formatos DASH AV1 podem ter melhor aspecto do que os
+      formatos DASH H.264. Os formatos DASH AV1 requerem mais potência para reprodução!
+      Eles não estão disponíveis em todos os vídeos, e nesses casos o reprodutor usará
+      os formatos DASH H.264.
   General Settings:
     Region for Trending: A região de tendências lhe permite de escolher quais vídeos
       de tendências do país você quer exibir. Nem todos os países exibidos são realmente
@@ -879,6 +920,13 @@ Tooltips:
       vídeo (lista de reprodução, se compatível) no player externo, na miniatura.
       Aviso, as configurações do Invidious não afetam os players externos.
     DefaultCustomArgumentsTemplate: "(Padrão: '{defaultCustomArguments}')"
+  Experimental Settings:
+    Replace HTTP Cache: Desabilita o cache HTTP baseado em disco do Electron e habilita
+      um cache de imagem em memória personalizado. Levará ao aumento do uso de RAM.
+  Distraction Free Settings:
+    Hide Channels: Digite um nome ou ID de canal para ocultar todos os vídeos, listas
+      de reprodução e o próprio canal dos resultados da busca ou nas tendências. O
+      nome do canal digitado deve coincidir exatamente, observando maiúsculas e minúsculas.
 More: Mais
 Playing Next Video Interval: Reproduzindo o próximo vídeo imediatamente. Clique para
   cancelar. | Reproduzindo o próximo vídeo em {nextVideoInterval} segundo(s). Clique
@@ -916,6 +964,19 @@ Age Restricted:
   Type:
     Channel: Canal
     Video: Vídeo
+  This {videoOrPlaylist} is age restricted: Esse(a) {videoOrPlaylist} tem restrição
+    de idade
 Screenshot Success: Captura de tela salva como "{filePath}"
 Screenshot Error: Falha na captura de tela. {error}
 Preferences: Preferências
+Clipboard:
+  Copy failed: Copiar para a área de transferência falhou
+  Cannot access clipboard without a secure connection: Não pode acessar a área de
+    transferência sem uma conexão segura
+Chapters:
+  'Chapters list visible, current chapter: {chapterName}': 'Lista visível de capítulos,
+    capítulo atual: {chapterName}'
+  'Chapters list hidden, current chapter: {chapterName}': 'Lista oculta de capítulos,
+    capítulo atual: {chapterName}'
+  Chapters: Capítulos
+Ok: Ok

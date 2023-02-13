@@ -1,15 +1,17 @@
-import Vue from 'vue'
+import { defineComponent } from 'vue'
 import FtIconButton from '../ft-icon-button/ft-icon-button.vue'
 import { mapActions } from 'vuex'
-import i18n from '../../i18n/index'
 import {
   copyToClipboard,
+  formatDurationAsTimestamp,
+  formatNumber,
   openExternalLink,
   showToast,
-  toLocalePublicationString
+  toLocalePublicationString,
+  toDistractionFreeTitle
 } from '../../helpers/utils'
 
-export default Vue.extend({
+export default defineComponent({
   name: 'FtListVideo',
   components: {
     'ft-icon-button': FtIconButton
@@ -46,7 +48,11 @@ export default Vue.extend({
     appearance: {
       type: String,
       required: true
-    }
+    },
+    showVideoWithLastViewedPlaylist: {
+      type: Boolean,
+      default: false
+    },
   },
   data: function () {
     return {
@@ -97,7 +103,13 @@ export default Vue.extend({
     },
 
     invidiousUrl: function () {
-      return `${this.currentInvidiousInstance}/watch?v=${this.id}`
+      let videoUrl = `${this.currentInvidiousInstance}/watch?v=${this.id}`
+      // `playlistId` can be undefined
+      if (this.playlistIdFinal && this.playlistIdFinal.length !== 0) {
+        // `index` seems can be ignored
+        videoUrl += `&list=${this.playlistIdFinal}`
+      }
+      return videoUrl
     },
 
     invidiousChannelUrl: function () {
@@ -105,10 +117,21 @@ export default Vue.extend({
     },
 
     youtubeUrl: function () {
-      return `https://www.youtube.com/watch?v=${this.id}`
+      let videoUrl = `https://www.youtube.com/watch?v=${this.id}`
+      // `playlistId` can be undefined
+      if (this.playlistIdFinal && this.playlistIdFinal.length !== 0) {
+        // `index` seems can be ignored
+        videoUrl += `&list=${this.playlistIdFinal}`
+      }
+      return videoUrl
     },
 
     youtubeShareUrl: function () {
+      // `playlistId` can be undefined
+      if (this.playlistIdFinal && this.playlistIdFinal.length !== 0) {
+        // `index` seems can be ignored
+        return `https://youtu.be/${this.id}?list=${this.playlistIdFinal}`
+      }
       return `https://youtu.be/${this.id}`
     },
 
@@ -222,6 +245,10 @@ export default Vue.extend({
       return this.$store.getters.getHideLiveStreams
     },
 
+    hideUpcomingPremieres: function () {
+      return this.$store.getters.getHideUpcomingPremieres
+    },
+
     hideVideoViews: function () {
       return this.$store.getters.getHideVideoViews
     },
@@ -258,9 +285,43 @@ export default Vue.extend({
       return this.$store.getters.getSaveWatchedProgress
     },
 
-    currentLocale: function () {
-      return i18n.locale.replace('_', '-')
-    }
+    saveVideoHistoryWithLastViewedPlaylist: function () {
+      return this.$store.getters.getSaveVideoHistoryWithLastViewedPlaylist
+    },
+
+    showDistractionFreeTitles: function () {
+      return this.$store.getters.getShowDistractionFreeTitles
+    },
+
+    displayTitle: function () {
+      if (this.showDistractionFreeTitles) {
+        return toDistractionFreeTitle(this.data.title)
+      } else {
+        return this.data.title
+      }
+    },
+
+    historyIndex: function() {
+      return this.historyCache.findIndex((video) => {
+        return video.videoId === this.id
+      })
+    },
+
+    playlistIdFinal: function () {
+      if (this.playlistId) {
+        return this.playlistId
+      }
+
+      // Get playlist ID from history ONLY if option enabled
+      if (!this.showVideoWithLastViewedPlaylist) { return }
+      if (!this.saveVideoHistoryWithLastViewedPlaylist) { return }
+      const historyIndex = this.historyIndex
+      if (historyIndex === -1) {
+        return undefined
+      }
+
+      return this.historyCache[historyIndex].lastViewedPlaylistId
+    },
   },
   mounted: function () {
     this.parseVideoData()
@@ -275,7 +336,7 @@ export default Vue.extend({
         playbackRate: this.defaultPlayback,
         videoId: this.id,
         videoLength: this.data.lengthSeconds,
-        playlistId: this.playlistId,
+        playlistId: this.playlistIdFinal,
         playlistIndex: this.playlistIndex,
         playlistReverse: this.playlistReverse,
         playlistShuffle: this.playlistShuffle,
@@ -337,44 +398,6 @@ export default Vue.extend({
       }
     },
 
-    // For Invidious data, as duration is sent in seconds
-    calculateVideoDuration: function (lengthSeconds) {
-      if (typeof lengthSeconds === 'string') {
-        return lengthSeconds
-      }
-
-      if (typeof lengthSeconds === 'undefined') {
-        return '0:00'
-      }
-      let durationText = ''
-      let time = lengthSeconds
-      let hours = 0
-
-      if (time >= 3600) {
-        hours = Math.floor(time / 3600)
-        time = time - hours * 3600
-      }
-
-      let minutes = Math.floor(time / 60)
-      let seconds = time - minutes * 60
-
-      if (seconds < 10) {
-        seconds = '0' + seconds
-      }
-
-      if (minutes < 10 && hours > 0) {
-        minutes = '0' + minutes
-      }
-
-      if (hours > 0) {
-        durationText = hours + ':' + minutes + ':' + seconds
-      } else {
-        durationText = minutes + ':' + seconds
-      }
-
-      return durationText
-    },
-
     parseVideoData: function () {
       this.id = this.data.videoId
       this.title = this.data.title
@@ -382,14 +405,16 @@ export default Vue.extend({
 
       this.channelName = this.data.author
       this.channelId = this.data.authorId
-      this.duration = this.calculateVideoDuration(this.data.lengthSeconds)
+      this.duration = formatDurationAsTimestamp(this.data.lengthSeconds)
       this.description = this.data.description
       this.isLive = this.data.liveNow || this.data.lengthSeconds === 'undefined'
       this.isUpcoming = this.data.isUpcoming || this.data.premiere
       this.isPremium = this.data.premium || false
       this.viewCount = this.data.viewCount
 
-      if (typeof (this.data.premiereTimestamp) !== 'undefined') {
+      if (typeof this.data.premiereDate !== 'undefined') {
+        this.publishedText = this.data.premiereDate.toLocaleString()
+      } else if (typeof (this.data.premiereTimestamp) !== 'undefined') {
         this.publishedText = new Date(this.data.premiereTimestamp * 1000).toLocaleString()
       } else {
         this.publishedText = this.data.publishedText
@@ -408,7 +433,7 @@ export default Vue.extend({
       if (this.hideVideoViews) {
         this.hideViews = true
       } else if (typeof (this.data.viewCount) !== 'undefined' && this.data.viewCount !== null) {
-        this.parsedViewCount = Intl.NumberFormat(this.currentLocale).format(this.data.viewCount)
+        this.parsedViewCount = formatNumber(this.data.viewCount)
       } else if (typeof (this.data.viewCountText) !== 'undefined') {
         this.parsedViewCount = this.data.viewCountText.replace(' views', '')
       } else {
@@ -417,9 +442,7 @@ export default Vue.extend({
     },
 
     checkIfWatched: function () {
-      const historyIndex = this.historyCache.findIndex((video) => {
-        return video.videoId === this.id
-      })
+      const historyIndex = this.historyIndex
 
       if (historyIndex !== -1) {
         this.watched = true

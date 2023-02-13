@@ -1,10 +1,19 @@
-import IsEqual from 'lodash.isequal'
-import fs from 'fs'
+import fs from 'fs/promises'
 import path from 'path'
 import i18n from '../../i18n/index'
 
 import { IpcChannels } from '../../../constants'
-import { createWebURL, openExternalLink, showSaveDialog, showToast } from '../../helpers/utils'
+import { pathExists } from '../../helpers/filesystem'
+import {
+  createWebURL,
+  getVideoParamsFromUrl,
+  openExternalLink,
+  replaceFilenameForbiddenChars,
+  searchFiltersMatch,
+  showExternalPlayerUnsupportedActionToast,
+  showSaveDialog,
+  showToast
+} from '../../helpers/utils'
 
 const state = {
   isSideNavOpen: false,
@@ -16,6 +25,7 @@ const state = {
     gaming: null,
     movies: null
   },
+  cachedPlaylist: null,
   showProgressBar: false,
   progressBarPercentage: 0,
   regionNames: [],
@@ -52,6 +62,10 @@ const getters = {
 
   getTrendingCache () {
     return state.trendingCache
+  },
+
+  getCachedPlaylist() {
+    return state.cachedPlaylist
   },
 
   getSearchSettings () {
@@ -95,68 +109,14 @@ const getters = {
   }
 }
 
-/**
- * Wrapper function that calls `ipcRenderer.invoke(IRCtype, payload)` if the user is
- * using Electron or a provided custom callback otherwise.
- * @param {Object} context Object
- * @param {String} IRCtype String
- * @param {Function} webCbk Function
- * @param {Object} payload any (default: null)
-*/
-
-async function invokeIRC(context, IRCtype, webCbk, payload = null) {
-  let response = null
-  if (process.env.IS_ELECTRON) {
-    const { ipcRenderer } = require('electron')
-    response = await ipcRenderer.invoke(IRCtype, payload)
-  } else if (webCbk) {
-    response = await webCbk()
-  }
-
-  return response
-}
-
 const actions = {
-  replaceFilenameForbiddenChars(_, filenameOriginal) {
-    let filenameNew = filenameOriginal
-    let forbiddenChars = {}
-    switch (process.platform) {
-      case 'win32':
-        forbiddenChars = {
-          '<': '＜', // U+FF1C
-          '>': '＞', // U+FF1E
-          ':': '：', // U+FF1A
-          '"': '＂', // U+FF02
-          '/': '／', // U+FF0F
-          '\\': '＼', // U+FF3C
-          '|': '｜', // U+FF5C
-          '?': '？', // U+FF1F
-          '*': '＊' // U+FF0A
-        }
-        break
-      case 'darwin':
-        forbiddenChars = { '/': '／', ':': '：' }
-        break
-      case 'linux':
-        forbiddenChars = { '/': '／' }
-        break
-      default:
-        break
-    }
-
-    for (const forbiddenChar in forbiddenChars) {
-      filenameNew = filenameNew.replaceAll(forbiddenChar, forbiddenChars[forbiddenChar])
-    }
-    return filenameNew
-  },
-
-  async downloadMedia({ rootState, dispatch }, { url, title, extension, fallingBackPath }) {
+  async downloadMedia({ rootState }, { url, title, extension, fallingBackPath }) {
     if (!process.env.IS_ELECTRON) {
       openExternalLink(url)
       return
     }
 
-    const fileName = `${await dispatch('replaceFilenameForbiddenChars', title)}.${extension}`
+    const fileName = `${replaceFilenameForbiddenChars(title)}.${extension}`
     const errorMessage = i18n.t('Downloading failed', { videoTitle: title })
     let folderPath = rootState.settings.downloadFolderPath
 
@@ -179,9 +139,9 @@ const actions = {
 
       folderPath = response.filePath
     } else {
-      if (!fs.existsSync(folderPath)) {
+      if (!(await pathExists(folderPath))) {
         try {
-          fs.mkdirSync(folderPath, { recursive: true })
+          await fs.mkdir(folderPath, { recursive: true })
         } catch (err) {
           console.error(err)
           showToast(err)
@@ -224,35 +184,14 @@ const actions = {
     const blobFile = new Blob(chunks)
     const buffer = await blobFile.arrayBuffer()
 
-    fs.writeFile(folderPath, new DataView(buffer), (err) => {
-      if (err) {
-        console.error(err)
-        showToast(errorMessage)
-      } else {
-        showToast(i18n.t('Downloading has completed', { videoTitle: title }))
-      }
-    })
-  },
+    try {
+      await fs.writeFile(folderPath, new DataView(buffer))
 
-  async getSystemLocale (context) {
-    const webCbk = () => {
-      if (navigator && navigator.language) {
-        return navigator.language
-      }
+      showToast(i18n.t('Downloading has completed', { videoTitle: title }))
+    } catch (err) {
+      console.error(err)
+      showToast(errorMessage)
     }
-
-    return (await invokeIRC(context, IpcChannels.GET_SYSTEM_LOCALE, webCbk)) || 'en-US'
-  },
-
-  async getUserDataPath (context) {
-    // TODO: implement getUserDataPath web compatible callback
-    const webCbk = () => null
-    return await invokeIRC(context, IpcChannels.GET_USER_DATA_PATH, webCbk)
-  },
-
-  async getPicturesPath (context) {
-    const webCbk = () => null
-    return await invokeIRC(context, IpcChannels.GET_PICTURES_PATH, webCbk)
   },
 
   parseScreenshotCustomFileName: function({ rootState }, payload) {
@@ -276,27 +215,13 @@ const actions = {
         parsedString = parsedString.replaceAll(key, value)
       }
 
-      const platform = process.platform
-      if (platform === 'win32') {
-        // https://www.boost.org/doc/libs/1_78_0/libs/filesystem/doc/portability_guide.htm
-        // https://stackoverflow.com/questions/1976007/
-        const noForbiddenChars = ['<', '>', ':', '"', '/', '|', '?', '*'].every(char => {
-          return parsedString.indexOf(char) === -1
-        })
-        if (!noForbiddenChars) {
-          reject(new Error('Forbidden Characters')) // use message as translation key
-        }
-      } else if (platform === 'darwin') {
-        // https://superuser.com/questions/204287/
-        if (parsedString.indexOf(':') !== -1) {
-          reject(new Error('Forbidden Characters'))
-        }
+      if (parsedString !== replaceFilenameForbiddenChars(parsedString)) {
+        reject(new Error('Forbidden Characters')) // use message as translation key
       }
 
-      const dirChar = platform === 'win32' ? '\\' : '/'
       let filename
-      if (parsedString.indexOf(dirChar) !== -1) {
-        const lastIndex = parsedString.lastIndexOf(dirChar)
+      if (parsedString.indexOf(path.sep) !== -1) {
+        const lastIndex = parsedString.lastIndexOf(path.sep)
         filename = parsedString.substring(lastIndex + 1)
       } else {
         filename = parsedString
@@ -319,12 +244,12 @@ const actions = {
     // Exclude __dirname from path if not in electron
     const fileLocation = `${process.env.IS_ELECTRON ? process.env.NODE_ENV === 'development' ? '.' : __dirname : ''}/static/geolocations/`
     if (process.env.IS_ELECTRON) {
-      localePathExists = fs.existsSync(`${fileLocation}${locale}`)
+      localePathExists = await pathExists(`${fileLocation}${locale}`)
     } else {
       localePathExists = process.env.GEOLOCATION_NAMES.includes(locale)
     }
     const pathName = `${fileLocation}${localePathExists ? locale : 'en-US'}/countries.json`
-    const fileData = process.env.IS_ELECTRON ? JSON.parse(fs.readFileSync(pathName)) : await (await fetch(createWebURL(pathName))).json()
+    const fileData = process.env.IS_ELECTRON ? JSON.parse(await fs.readFile(pathName)) : await (await fetch(createWebURL(pathName))).json()
 
     const countries = fileData.map((entry) => { return { id: entry.id, name: entry.name, code: entry.alpha2 } })
     countries.sort((a, b) => { return a.id - b.id })
@@ -334,63 +259,6 @@ const actions = {
 
     commit('setRegionNames', regionNames)
     commit('setRegionValues', regionValues)
-  },
-
-  getVideoParamsFromUrl (_, url) {
-    /** @type {URL} */
-    let urlObject
-    const paramsObject = { videoId: null, timestamp: null, playlistId: null }
-    try {
-      urlObject = new URL(url)
-    } catch (e) {
-      return paramsObject
-    }
-
-    function extractParams(videoId) {
-      paramsObject.videoId = videoId
-      paramsObject.timestamp = urlObject.searchParams.get('t')
-    }
-
-    const extractors = [
-      // anything with /watch?v=
-      function() {
-        if (urlObject.pathname === '/watch' && urlObject.searchParams.has('v')) {
-          extractParams(urlObject.searchParams.get('v'))
-          paramsObject.playlistId = urlObject.searchParams.get('list')
-          return paramsObject
-        }
-      },
-      // youtu.be
-      function() {
-        if (urlObject.host === 'youtu.be' && urlObject.pathname.match(/^\/[A-Za-z0-9_-]+$/)) {
-          extractParams(urlObject.pathname.slice(1))
-          return paramsObject
-        }
-      },
-      // youtube.com/embed
-      function() {
-        if (urlObject.pathname.match(/^\/embed\/[A-Za-z0-9_-]+$/)) {
-          extractParams(urlObject.pathname.replace('/embed/', ''))
-          return paramsObject
-        }
-      },
-      // youtube.com/shorts
-      function() {
-        if (urlObject.pathname.match(/^\/shorts\/[A-Za-z0-9_-]+$/)) {
-          extractParams(urlObject.pathname.replace('/shorts/', ''))
-          return paramsObject
-        }
-      },
-      // cloudtube
-      function() {
-        if (urlObject.host.match(/^cadence\.(gq|moe)$/) && urlObject.pathname.match(/^\/cloudtube\/video\/[A-Za-z0-9_-]+$/)) {
-          extractParams(urlObject.pathname.slice('/cloudtube/video/'.length))
-          return paramsObject
-        }
-      }
-    ]
-
-    return extractors.reduce((a, c) => a || c(), null) || paramsObject
   },
 
   getYoutubeUrlInfo ({ state }, urlStr) {
@@ -420,7 +288,7 @@ const actions = {
     //
     // If `urlType` is "invalid_url"
     // Nothing else
-    const { videoId, timestamp, playlistId } = actions.getVideoParamsFromUrl(null, urlStr)
+    const { videoId, timestamp, playlistId } = getVideoParamsFromUrl(urlStr)
     if (videoId) {
       return {
         urlType: 'video',
@@ -444,9 +312,9 @@ const actions = {
       /^\/(?:(?<type>channel|user|c)\/)?(?<channelId>[^/]+)(?:\/(join|featured|videos|playlists|about|community|channels))?\/?$/
 
     const typePatterns = new Map([
-      ['playlist', /^\/playlist\/?$/],
+      ['playlist', /^(\/playlist\/?|\/embed(\/?videoseries)?)$/],
       ['search', /^\/results\/?$/],
-      ['hashtag', /^\/hashtag\/([^/?&#]+)$/],
+      ['hashtag', /^\/hashtag\/([^#&/?]+)$/],
       ['channel', channelPattern]
     ])
 
@@ -581,18 +449,14 @@ const actions = {
     commit('setSessionSearchHistory', [])
   },
 
-  showExternalPlayerUnsupportedActionToast: function (_, { externalPlayer, action }) {
-    showToast(i18n.t('Video.External Player.UnsupportedActionTemplate', { externalPlayer, action }))
-  },
-
-  getExternalPlayerCmdArgumentsData ({ commit }, payload) {
+  async getExternalPlayerCmdArgumentsData ({ commit }, payload) {
     const fileName = 'external-player-map.json'
     let fileData
-    /* eslint-disable-next-line */
+    /* eslint-disable-next-line n/no-path-concat */
     const fileLocation = process.env.NODE_ENV === 'development' ? './static/' : `${__dirname}/static/`
 
-    if (fs.existsSync(`${fileLocation}${fileName}`)) {
-      fileData = fs.readFileSync(`${fileLocation}${fileName}`)
+    if (await pathExists(`${fileLocation}${fileName}`)) {
+      fileData = await fs.readFile(`${fileLocation}${fileName}`)
     } else {
       fileData = '[{"name":"None","value":"","cmdArguments":null}]'
     }
@@ -615,7 +479,7 @@ const actions = {
     commit('setExternalPlayerCmdArguments', externalPlayerCmdArguments)
   },
 
-  openInExternalPlayer ({ dispatch, state, rootState }, payload) {
+  openInExternalPlayer ({ state, rootState }, payload) {
     const args = []
     const externalPlayer = rootState.settings.externalPlayer
     const cmdArgs = state.externalPlayerCmdArguments[externalPlayer]
@@ -639,34 +503,25 @@ const actions = {
       if (typeof cmdArgs.startOffset === 'string') {
         args.push(`${cmdArgs.startOffset}${payload.watchProgress}`)
       } else if (!ignoreWarnings) {
-        dispatch('showExternalPlayerUnsupportedActionToast', {
-          externalPlayer,
-          action: i18n.t('Video.External Player.Unsupported Actions.starting video at offset')
-        })
+        showExternalPlayerUnsupportedActionToast(externalPlayer, 'starting video at offset')
       }
     }
 
-    if (payload.playbackRate !== null) {
+    if (payload.playbackRate != null) {
       if (typeof cmdArgs.playbackRate === 'string') {
         args.push(`${cmdArgs.playbackRate}${payload.playbackRate}`)
       } else if (!ignoreWarnings) {
-        dispatch('showExternalPlayerUnsupportedActionToast', {
-          externalPlayer,
-          action: i18n.t('Video.External Player.Unsupported Actions.setting a playback rate')
-        })
+        showExternalPlayerUnsupportedActionToast(externalPlayer, 'setting a playback rate')
       }
     }
 
     // Check whether the video is in a playlist
-    if (typeof cmdArgs.playlistUrl === 'string' && payload.playlistId !== null && payload.playlistId !== '') {
-      if (payload.playlistIndex !== null) {
+    if (typeof cmdArgs.playlistUrl === 'string' && payload.playlistId != null && payload.playlistId !== '') {
+      if (payload.playlistIndex != null) {
         if (typeof cmdArgs.playlistIndex === 'string') {
           args.push(`${cmdArgs.playlistIndex}${payload.playlistIndex}`)
         } else if (!ignoreWarnings) {
-          dispatch('showExternalPlayerUnsupportedActionToast', {
-            externalPlayer,
-            action: i18n.t('Video.External Player.Unsupported Actions.opening specific video in a playlist (falling back to opening the video)')
-          })
+          showExternalPlayerUnsupportedActionToast(externalPlayer, 'opening specific video in a playlist (falling back to opening the video)')
         }
       }
 
@@ -674,10 +529,7 @@ const actions = {
         if (typeof cmdArgs.playlistReverse === 'string') {
           args.push(cmdArgs.playlistReverse)
         } else if (!ignoreWarnings) {
-          dispatch('showExternalPlayerUnsupportedActionToast', {
-            externalPlayer,
-            action: i18n.t('Video.External Player.Unsupported Actions.reversing playlists')
-          })
+          showExternalPlayerUnsupportedActionToast(externalPlayer, 'reversing playlists')
         }
       }
 
@@ -685,10 +537,7 @@ const actions = {
         if (typeof cmdArgs.playlistShuffle === 'string') {
           args.push(cmdArgs.playlistShuffle)
         } else if (!ignoreWarnings) {
-          dispatch('showExternalPlayerUnsupportedActionToast', {
-            externalPlayer,
-            action: i18n.t('Video.External Player.Unsupported Actions.shuffling playlists')
-          })
+          showExternalPlayerUnsupportedActionToast(externalPlayer, 'shuffling playlists')
         }
       }
 
@@ -696,10 +545,7 @@ const actions = {
         if (typeof cmdArgs.playlistLoop === 'string') {
           args.push(cmdArgs.playlistLoop)
         } else if (!ignoreWarnings) {
-          dispatch('showExternalPlayerUnsupportedActionToast', {
-            externalPlayer,
-            action: i18n.t('Video.External Player.Unsupported Actions.looping playlists')
-          })
+          showExternalPlayerUnsupportedActionToast(externalPlayer, 'looping playlists')
         }
       }
       if (cmdArgs.supportsYtdlProtocol) {
@@ -708,13 +554,10 @@ const actions = {
         args.push(`${cmdArgs.playlistUrl}https://youtube.com/playlist?list=${payload.playlistId}`)
       }
     } else {
-      if (payload.playlistId !== null && payload.playlistId !== '' && !ignoreWarnings) {
-        dispatch('showExternalPlayerUnsupportedActionToast', {
-          externalPlayer,
-          action: i18n.t('Video.External Player.Unsupported Actions.opening playlists')
-        })
+      if (payload.playlistId != null && payload.playlistId !== '' && !ignoreWarnings) {
+        showExternalPlayerUnsupportedActionToast(externalPlayer, 'opening playlists')
       }
-      if (payload.videoId !== null) {
+      if (payload.videoId != null) {
         if (cmdArgs.supportsYtdlProtocol) {
           args.push(`${cmdArgs.videoUrl}ytdl://${payload.videoId}`)
         } else {
@@ -723,9 +566,9 @@ const actions = {
       }
     }
 
-    const videoOrPlaylist = payload.playlistId === null || payload.playlistId === ''
-      ? i18n.t('Video.External Player.video')
-      : i18n.t('Video.External Player.playlist')
+    const videoOrPlaylist = payload.playlistId != null && payload.playlistId !== ''
+      ? i18n.t('Video.External Player.playlist')
+      : i18n.t('Video.External Player.video')
 
     showToast(i18n.t('Video.External Player.OpeningTemplate', { videoOrPlaylist, externalPlayer }))
 
@@ -753,7 +596,7 @@ const mutations = {
 
   addToSessionSearchHistory (state, payload) {
     const sameSearch = state.sessionSearchHistory.findIndex((search) => {
-      return search.query === payload.query && IsEqual(payload.searchSettings, search.searchSettings)
+      return search.query === payload.query && searchFiltersMatch(payload.searchSettings, search.searchSettings)
     })
 
     if (sameSearch !== -1) {
@@ -770,6 +613,10 @@ const mutations = {
 
   setTrendingCache (state, { value, page }) {
     state.trendingCache[page] = value
+  },
+
+  setCachedPlaylist(state, value) {
+    state.cachedPlaylist = value
   },
 
   setSearchSortBy (state, value) {

@@ -1,4 +1,4 @@
-import Vue from 'vue'
+import { defineComponent } from 'vue'
 import { mapActions } from 'vuex'
 import FtCard from '../../components/ft-card/ft-card.vue'
 import FtPrompt from '../../components/ft-prompt/ft-prompt.vue'
@@ -6,9 +6,10 @@ import FtFlexBox from '../../components/ft-flex-box/ft-flex-box.vue'
 import FtInput from '../../components/ft-input/ft-input.vue'
 import FtButton from '../../components/ft-button/ft-button.vue'
 import { MAIN_PROFILE_ID } from '../../../constants'
-import { calculateColorLuminance, colors, showToast } from '../../helpers/utils'
+import { calculateColorLuminance, colors } from '../../helpers/colors'
+import { showToast } from '../../helpers/utils'
 
-export default Vue.extend({
+export default defineComponent({
   name: 'FtProfileEdit',
   components: {
     'ft-card': FtCard,

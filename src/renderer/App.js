@@ -1,4 +1,4 @@
-import Vue from 'vue'
+import Vue, { defineComponent } from 'vue'
 import { mapActions, mapMutations } from 'vuex'
 import { ObserveVisibility } from 'vue-observe-visibility'
 import FtFlexBox from './components/ft-flex-box/ft-flex-box.vue'
@@ -12,13 +12,13 @@ import FtProgressBar from './components/ft-progress-bar/ft-progress-bar.vue'
 import { marked } from 'marked'
 import { IpcChannels } from '../constants'
 import packageDetails from '../../package.json'
-import { openExternalLink, showToast } from './helpers/utils'
+import { openExternalLink, openInternalPath, showToast } from './helpers/utils'
 
 let ipcRenderer = null
 
 Vue.directive('observe-visibility', ObserveVisibility)
 
-export default Vue.extend({
+export default defineComponent({
   name: 'App',
   components: {
     FtFlexBox,
@@ -76,10 +76,10 @@ export default Vue.extend({
       if (this.$route.meta.title !== 'Channel' && this.$route.meta.title !== 'Watch') {
         let title =
         this.$route.meta.path === '/home'
-          ? process.env.PRODUCT_NAME
-          : `${this.$t(this.$route.meta.title)} - ${process.env.PRODUCT_NAME}`
+          ? packageDetails.productName
+          : `${this.$t(this.$route.meta.title)} - ${packageDetails.productName}`
         if (!title) {
-          title = process.env.PRODUCT_NAME
+          title = packageDetails.productName
         }
         return title
       } else {
@@ -159,6 +159,7 @@ export default Vue.extend({
           ipcRenderer = require('electron').ipcRenderer
           this.setupListenersToSyncWindows()
           this.activateKeyboardShortcuts()
+          this.activateIPCListeners()
           this.openAllLinksExternally()
           this.enableSetSearchQueryText()
           this.enableOpenUrl()
@@ -292,15 +293,19 @@ export default Vue.extend({
       })
     },
 
+    activateIPCListeners: function () {
+      // handle menu event updates from main script
+      ipcRenderer.on('history-back', (_event) => {
+        this.$refs.topNav.historyBack()
+      })
+      ipcRenderer.on('history-forward', (_event) => {
+        this.$refs.topNav.historyForward()
+      })
+    },
+
     handleKeyboardShortcuts: function (event) {
       if (event.altKey) {
         switch (event.key) {
-          case 'ArrowRight':
-            this.$refs.topNav.historyForward()
-            break
-          case 'ArrowLeft':
-            this.$refs.topNav.historyBack()
-            break
           case 'D':
           case 'd':
             this.$refs.topNav.focusSearch()
@@ -381,9 +386,9 @@ export default Vue.extend({
             if (playlistId && playlistId.length > 0) {
               query.playlistId = playlistId
             }
-            const path = `/watch/${videoId}`
-            this.openInternalPath({
-              path,
+
+            openInternalPath({
+              path: `/watch/${videoId}`,
               query,
               doCreateNewWindow
             })
@@ -393,9 +398,8 @@ export default Vue.extend({
           case 'playlist': {
             const { playlistId, query } = result
 
-            const path = `/playlist/${playlistId}`
-            this.openInternalPath({
-              path,
+            openInternalPath({
+              path: `/playlist/${playlistId}`,
               query,
               doCreateNewWindow
             })
@@ -405,9 +409,8 @@ export default Vue.extend({
           case 'search': {
             const { searchQuery, query } = result
 
-            const path = `/search/${encodeURIComponent(searchQuery)}`
-            this.openInternalPath({
-              path,
+            openInternalPath({
+              path: `/search/${encodeURIComponent(searchQuery)}`,
               query,
               doCreateNewWindow,
               searchQueryText: searchQuery
@@ -429,9 +432,8 @@ export default Vue.extend({
           case 'channel': {
             const { channelId, subPath } = result
 
-            const path = `/channel/${channelId}/${subPath}`
-            this.openInternalPath({
-              path,
+            openInternalPath({
+              path: `/channel/${channelId}/${subPath}`,
               doCreateNewWindow
             })
             break
@@ -463,28 +465,6 @@ export default Vue.extend({
       ipcRenderer.on(IpcChannels.NATIVE_THEME_UPDATE, (event, shouldUseDarkColors) => {
         document.body.dataset.systemTheme = shouldUseDarkColors ? 'dark' : 'light'
       })
-    },
-
-    openInternalPath: function({ path, doCreateNewWindow, query = {}, searchQueryText = null }) {
-      if (process.env.IS_ELECTRON && doCreateNewWindow) {
-        const { ipcRenderer } = require('electron')
-
-        // Combine current document path and new "hash" as new window startup URL
-        const newWindowStartupURL = [
-          window.location.href.split('#')[0],
-          `#${path}?${(new URLSearchParams(query)).toString()}`
-        ].join('')
-        ipcRenderer.send(IpcChannels.CREATE_NEW_WINDOW, {
-          windowStartupUrl: newWindowStartupURL,
-          searchQueryText
-        })
-      } else {
-        // Web
-        this.$router.push({
-          path,
-          query
-        })
-      }
     },
 
     enableSetSearchQueryText: function () {

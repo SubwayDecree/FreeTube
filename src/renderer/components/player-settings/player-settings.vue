@@ -35,6 +35,7 @@
         <ft-toggle-switch
           :label="$t('Settings.Player Settings.Scroll Volume Over Video Player')"
           :compact="true"
+          :disabled="videoSkipMouseScroll"
           :default-value="videoVolumeMouseScroll"
           @change="updateVideoVolumeMouseScroll"
         />
@@ -46,10 +47,12 @@
           @change="updateVideoPlaybackRateMouseScroll"
         />
         <ft-toggle-switch
-          :label="$t('Settings.Player Settings.Display Play Button In Video Player')"
+          :label="$t('Settings.Player Settings.Skip by Scrolling Over Video Player')"
           :compact="true"
-          :default-value="displayVideoPlayButton"
-          @change="updateDisplayVideoPlayButton"
+          :disabled="videoVolumeMouseScroll"
+          :default-value="videoSkipMouseScroll"
+          :tooltip="$t('Tooltips.Player Settings.Skip by Scrolling Over Video Player')"
+          @change="updateVideoSkipMouseScroll"
         />
       </div>
       <div class="switchColumn">
@@ -71,6 +74,18 @@
           :disabled="hideRecommendedVideos"
           :default-value="playNextVideo"
           @change="updatePlayNextVideo"
+        />
+        <ft-toggle-switch
+          :label="$t('Settings.Player Settings.Display Play Button In Video Player')"
+          :compact="true"
+          :default-value="displayVideoPlayButton"
+          @change="updateDisplayVideoPlayButton"
+        />
+        <ft-toggle-switch
+          :label="$t('Settings.Player Settings.Enter Fullscreen on Display Rotate')"
+          :compact="true"
+          :default-value="enterFullscreenOnDisplayRotate"
+          @change="updateEnterFullscreenOnDisplayRotate"
         />
       </div>
     </div>
@@ -143,6 +158,14 @@
         :select-names="qualityNames"
         :select-values="qualityValues"
         @change="updateDefaultQuality"
+      />
+      <ft-toggle-switch
+        class="av1Switch"
+        :label="$t('Settings.Player Settings.Allow DASH AV1 formats')"
+        :compact="true"
+        :default-value="allowDashAv1Formats"
+        :tooltip="$t('Tooltips.Player Settings.Allow DASH AV1 formats')"
+        @change="updateAllowDashAv1Formats"
       />
     </ft-flex-box>
     <br>
@@ -231,4 +254,4 @@
 </template>
 
 <script src="./player-settings.js" />
-<style scoped lang="sass" src="./player-settings.sass" />
+<style scoped lang="scss" src="./player-settings.scss" />

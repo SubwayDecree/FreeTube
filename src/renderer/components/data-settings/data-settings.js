@@ -1,4 +1,4 @@
-import Vue from 'vue'
+import { defineComponent } from 'vue'
 import FtSettingsSection from '../ft-settings-section/ft-settings-section.vue'
 import { mapActions, mapMutations } from 'vuex'
 import FtButton from '../ft-button/ft-button.vue'
@@ -6,20 +6,19 @@ import FtFlexBox from '../ft-flex-box/ft-flex-box.vue'
 import FtPrompt from '../ft-prompt/ft-prompt.vue'
 import { MAIN_PROFILE_ID } from '../../../constants'
 
-import { opmlToJSON } from 'opml-to-json'
 import ytch from 'yt-channel-info'
+import { calculateColorLuminance, getRandomColor } from '../../helpers/colors'
 import {
-  calculateColorLuminance,
   copyToClipboard,
-  getRandomColor,
   readFileFromDialog,
   showOpenDialog,
   showSaveDialog,
   showToast,
   writeFileFromDialog
 } from '../../helpers/utils'
+import { invidiousAPICall } from '../../helpers/api/invidious'
 
-export default Vue.extend({
+export default defineComponent({
   name: 'DataSettings',
   components: {
     'ft-settings-section': FtSettingsSection,
@@ -76,9 +75,6 @@ export default Vue.extend({
         `${exportYouTube} (.opml)`,
         `${exportNewPipe} (.json)`
       ]
-    },
-    usingElectron: function () {
-      return process.env.IS_ELECTRON
     },
     primaryProfile: function () {
       return JSON.parse(JSON.stringify(this.profileList[0]))
@@ -230,7 +226,7 @@ export default Vue.extend({
       let count = 0
 
       const ytsubs = youtubeSubscriptions.slice(1).map(yt => {
-        const splitCSVRegex = /(?:,|\n|^)("(?:(?:"")*[^"]*)*"|[^",\n]*|(?:\n|$))/g
+        const splitCSVRegex = /(?:,|\n|^)("(?:(?:"")*[^"]*)*"|[^\n",]*|(?:\n|$))/g
         return [...yt.matchAll(splitCSVRegex)].map(s => {
           let newVal = s[1]
           if (newVal.startsWith('"')) {
@@ -331,79 +327,97 @@ export default Vue.extend({
     },
 
     importOpmlYouTubeSubscriptions: async function (data) {
-      let json
+      let xmlDom
+      const domParser = new DOMParser()
       try {
-        json = await opmlToJSON(data)
+        xmlDom = domParser.parseFromString(data, 'application/xml')
+
+        // https://developer.mozilla.org/en-US/docs/Web/API/DOMParser/parseFromString#error_handling
+        const errorNode = xmlDom.querySelector('parsererror')
+        if (errorNode) {
+          throw errorNode.textContent
+        }
       } catch (err) {
+        console.error('error reading OPML subscriptions file, falling back to HTML parser...')
         console.error(err)
-        console.error('error reading')
-        const message = this.$t('Settings.Data Settings.Invalid subscriptions file')
-        showToast(`${message}: ${err}`)
+        // try parsing with the html parser instead which is more lenient
+        try {
+          const htmlDom = domParser.parseFromString(data, 'text/html')
+
+          xmlDom = htmlDom
+        } catch {
+          const message = this.$t('Settings.Data Settings.Invalid subscriptions file')
+          showToast(`${message}: ${err}`)
+          return
+        }
       }
 
-      if (json !== undefined) {
-        let feedData = json.children[0].children
-        if (typeof feedData === 'undefined') {
-          if (json.title.includes('gPodder')) {
-            feedData = json.children
+      const feedData = xmlDom.querySelectorAll('body outline[xmlUrl]')
+      if (feedData.length === 0) {
+        const message = this.$t('Settings.Data Settings.Invalid subscriptions file')
+        showToast(message)
+        return
+      }
+
+      const subscriptions = []
+
+      showToast(this.$t('Settings.Data Settings.This might take a while, please wait'))
+
+      this.updateShowProgressBar(true)
+      this.setProgressBarPercentage(0)
+
+      let count = 0
+
+      feedData.forEach(async (channel) => {
+        const xmlUrl = channel.getAttribute('xmlUrl')
+        let channelId
+        if (xmlUrl.includes('https://www.youtube.com/feeds/videos.xml?channel_id=')) {
+          channelId = new URL(xmlUrl).searchParams.get('channel_id')
+        } else if (xmlUrl.includes('/feed/channel/')) {
+          // handle invidious exports https://yewtu.be/feed/channel/{CHANNELID}
+          channelId = new URL(xmlUrl).pathname.split('/').filter(part => part).at(-1)
+        } else {
+          console.error(`Unknown xmlUrl format: ${xmlUrl}`)
+        }
+        const subExists = this.primaryProfile.subscriptions.findIndex((sub) => {
+          return sub.id === channelId
+        })
+        if (subExists === -1) {
+          let channelInfo
+          if (this.backendPreference === 'invidious') {
+            channelInfo = await this.getChannelInfoInvidious(channelId)
           } else {
-            const message = this.$t('Settings.Data Settings.Invalid subscriptions file')
-            showToast(message)
-            return
+            channelInfo = await this.getChannelInfoLocal(channelId)
+          }
+
+          if (typeof channelInfo.author !== 'undefined') {
+            const subscription = {
+              id: channelId,
+              name: channelInfo.author,
+              thumbnail: channelInfo.authorThumbnails[1].url
+            }
+            subscriptions.push(subscription)
           }
         }
 
-        const subscriptions = []
+        count++
 
-        showToast(this.$t('Settings.Data Settings.This might take a while, please wait'))
+        const progressPercentage = (count / feedData.length) * 100
+        this.setProgressBarPercentage(progressPercentage)
 
-        this.updateShowProgressBar(true)
-        this.setProgressBarPercentage(0)
+        if (count === feedData.length) {
+          this.primaryProfile.subscriptions = this.primaryProfile.subscriptions.concat(subscriptions)
+          this.updateProfile(this.primaryProfile)
 
-        let count = 0
-
-        feedData.forEach(async (channel, index) => {
-          const channelId = channel.xmlurl.replace('https://www.youtube.com/feeds/videos.xml?channel_id=', '')
-          const subExists = this.primaryProfile.subscriptions.findIndex((sub) => {
-            return sub.id === channelId
-          })
-          if (subExists === -1) {
-            let channelInfo
-            if (this.backendPreference === 'invidious') {
-              channelInfo = await this.getChannelInfoInvidious(channelId)
-            } else {
-              channelInfo = await this.getChannelInfoLocal(channelId)
-            }
-
-            if (typeof channelInfo.author !== 'undefined') {
-              const subscription = {
-                id: channelId,
-                name: channelInfo.author,
-                thumbnail: channelInfo.authorThumbnails[1].url
-              }
-              subscriptions.push(subscription)
-            }
+          if (subscriptions.length < count) {
+            showToast(this.$t('Settings.Data Settings.One or more subscriptions were unable to be imported'))
+          } else {
+            showToast(this.$t('Settings.Data Settings.All subscriptions have been successfully imported'))
           }
 
-          count++
-
-          const progressPercentage = (count / feedData.length) * 100
-          this.setProgressBarPercentage(progressPercentage)
-
-          if (count === feedData.length) {
-            this.primaryProfile.subscriptions = this.primaryProfile.subscriptions.concat(subscriptions)
-            this.updateProfile(this.primaryProfile)
-
-            if (subscriptions.length < count) {
-              showToast(this.$t('Settings.Data Settings.One or more subscriptions were unable to be imported'))
-            } else {
-              showToast(this.$t('Settings.Data Settings.All subscriptions have been successfully imported'))
-            }
-
-            this.updateShowProgressBar(false)
-          }
-        })
-      }
+          this.updateShowProgressBar(false)
+        }
+      })
     },
 
     importNewPipeSubscriptions: async function (newPipeData) {
@@ -508,19 +522,7 @@ export default Vue.extend({
         ]
       }
 
-      const response = await showSaveDialog(options)
-      if (response.canceled || response.filePath === '') {
-        // User canceled the save dialog
-        return
-      }
-      try {
-        await writeFileFromDialog(response, subscriptionsDb)
-      } catch (writeErr) {
-        const message = this.$t('Settings.Data Settings.Unable to read file')
-        showToast(`${message}: ${writeErr}`)
-        return
-      }
-      showToast(this.$t('Settings.Data Settings.Subscriptions have been successfully exported'))
+      await this.promptAndWriteToFile(options, subscriptionsDb, 'Subscriptions have been successfully exported')
     },
 
     exportYouTubeSubscriptions: async function () {
@@ -573,20 +575,7 @@ export default Vue.extend({
         return object
       })
 
-      const response = await showSaveDialog(options)
-      if (response.canceled || response.filePath === '') {
-        // User canceled the save dialog
-        return
-      }
-
-      try {
-        await writeFileFromDialog(response, JSON.stringify(subscriptionsObject))
-      } catch (writeErr) {
-        const message = this.$t('Settings.Data Settings.Unable to write file')
-        showToast(`${message}: ${writeErr}`)
-        return
-      }
-      showToast(this.$t('Settings.Data Settings.Subscriptions have been successfully exported'))
+      await this.promptAndWriteToFile(options, JSON.stringify(subscriptionsObject), 'Subscriptions have been successfully exported')
     },
 
     exportOpmlYouTubeSubscriptions: async function () {
@@ -604,34 +593,22 @@ export default Vue.extend({
       }
 
       let opmlData = '<opml version="1.1"><body><outline text="YouTube Subscriptions" title="YouTube Subscriptions">'
-      const endingOpmlString = '</outline></body></opml>'
-
-      let count = 0
 
       this.profileList[0].subscriptions.forEach((channel) => {
-        const channelOpmlString = `<outline text="${channel.name}" title="${channel.name}" type="rss" xmlUrl="https://www.youtube.com/feeds/videos.xml?channel_id=${channel.id}"/>`
-        count++
-        opmlData += channelOpmlString
+        const escapedName = channel.name
+          .replaceAll('&', '&amp;')
+          .replaceAll('<', '&lt;')
+          .replaceAll('>', '&gt;')
+          .replaceAll('"', '&quot;')
+          .replaceAll('\'', '&apos;')
 
-        if (count === this.profileList[0].subscriptions.length) {
-          opmlData += endingOpmlString
-        }
+        const channelOpmlString = `<outline text="${escapedName}" title="${escapedName}" type="rss" xmlUrl="https://www.youtube.com/feeds/videos.xml?channel_id=${channel.id}"/>`
+        opmlData += channelOpmlString
       })
 
-      const response = await showSaveDialog(options)
-      if (response.canceled || response.filePath === '') {
-        // User canceled the save dialog
-        return
-      }
+      opmlData += '</outline></body></opml>'
 
-      try {
-        await writeFileFromDialog(response, opmlData)
-      } catch (writeErr) {
-        const message = this.$t('Settings.Data Settings.Unable to write file')
-        showToast(`${message}: ${writeErr}`)
-        return
-      }
-      showToast(this.$t('Settings.Data Settings.Subscriptions have been successfully exported'))
+      await this.promptAndWriteToFile(options, opmlData, 'Subscriptions have been successfully exported')
     },
 
     exportCsvYouTubeSubscriptions: async function () {
@@ -657,20 +634,8 @@ export default Vue.extend({
         exportText += `${channel.id},${channelUrl},${channelName}\n`
       })
       exportText += '\n'
-      const response = await showSaveDialog(options)
-      if (response.canceled || response.filePath === '') {
-        // User canceled the save dialog
-        return
-      }
 
-      try {
-        await writeFileFromDialog(response, exportText)
-      } catch (writeErr) {
-        const message = this.$t('Settings.Data Settings.Unable to write file')
-        showToast(`${message}: ${writeErr}`)
-        return
-      }
-      showToast(this.$t('Settings.Data Settings.Subscriptions have been successfully exported'))
+      await this.promptAndWriteToFile(options, exportText, 'Subscriptions have been successfully exported')
     },
 
     exportNewPipeSubscriptions: async function () {
@@ -704,19 +669,7 @@ export default Vue.extend({
         newPipeObject.subscriptions.push(subscription)
       })
 
-      const response = await showSaveDialog(options)
-      if (response.canceled || response.filePath === '') {
-        // User canceled the save dialog
-        return
-      }
-      try {
-        await writeFileFromDialog(response, JSON.stringify(newPipeObject))
-      } catch (writeErr) {
-        const message = this.$t('Settings.Data Settings.Unable to write file')
-        showToast(`${message}: ${writeErr}`)
-        return
-      }
-      showToast(this.$t('Settings.Data Settings.Subscriptions have been successfully exported'))
+      await this.promptAndWriteToFile(options, JSON.stringify(newPipeObject), 'Subscriptions have been successfully exported')
     },
 
     importHistory: async function () {
@@ -804,19 +757,7 @@ export default Vue.extend({
         ]
       }
 
-      const response = await showSaveDialog(options)
-      if (response.canceled || response.filePath === '') {
-        // User canceled the save dialog
-        return
-      }
-
-      try {
-        await writeFileFromDialog(response, historyDb)
-      } catch (writeErr) {
-        const message = this.$t('Settings.Data Settings.Unable to write file')
-        showToast(`${message}: ${writeErr}`)
-      }
-      showToast(this.$t('Settings.Data Settings.All watched history has been successfully exported'))
+      await this.promptAndWriteToFile(options, historyDb, 'All watched history has been successfully exported')
     },
 
     importPlaylists: async function () {
@@ -947,19 +888,7 @@ export default Vue.extend({
         ]
       }
 
-      const response = await showSaveDialog(options)
-      if (response.canceled || response.filePath === '') {
-        // User canceled the save dialog
-        return
-      }
-      try {
-        await writeFileFromDialog(response, JSON.stringify(this.allPlaylists))
-      } catch (writeErr) {
-        const message = this.$t('Settings.Data Settings.Unable to write file')
-        showToast(`${message}: ${writeErr}`)
-        return
-      }
-      showToast(`${this.$t('Settings.Data Settings.All playlists has been successfully exported')}`)
+      await this.promptAndWriteToFile(options, JSON.stringify(this.allPlaylists), 'All playlists has been successfully exported')
     },
 
     convertOldFreeTubeFormatToNew(oldData) {
@@ -993,6 +922,24 @@ export default Vue.extend({
       return convertedData
     },
 
+    promptAndWriteToFile: async function (saveOptions, content, successMessageKeySuffix) {
+      const response = await showSaveDialog(saveOptions)
+      if (response.canceled || response.filePath === '') {
+        // User canceled the save dialog
+        return
+      }
+
+      try {
+        await writeFileFromDialog(response, content)
+      } catch (writeErr) {
+        const message = this.$t('Settings.Data Settings.Unable to write file')
+        showToast(`${message}: ${writeErr}`)
+        return
+      }
+
+      showToast(this.$t(`Settings.Data Settings.${successMessageKeySuffix}`))
+    },
+
     getChannelInfoInvidious: function (channelId) {
       return new Promise((resolve, reject) => {
         const subscriptionsPayload = {
@@ -1001,7 +948,7 @@ export default Vue.extend({
           params: {}
         }
 
-        this.invidiousAPICall(subscriptionsPayload).then((response) => {
+        invidiousAPICall(subscriptionsPayload).then((response) => {
           resolve(response)
         }).catch((err) => {
           console.error(err)
@@ -1010,7 +957,7 @@ export default Vue.extend({
             copyToClipboard(err.responseJSON.error)
           })
 
-          if (this.backendFallback && this.backendPreference === 'invidious') {
+          if (process.env.IS_ELECTRON && this.backendFallback && this.backendPreference === 'invidious') {
             showToast(this.$t('Falling back to the local API'))
             resolve(this.getChannelInfoLocal(channelId))
           } else {
@@ -1099,13 +1046,11 @@ export default Vue.extend({
     },
 
     ...mapActions([
-      'invidiousAPICall',
       'updateProfile',
       'compactProfiles',
       'updateShowProgressBar',
       'updateHistory',
       'compactHistory',
-      'getUserDataPath',
       'addPlaylist',
       'addVideo'
     ]),
